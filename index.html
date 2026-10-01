@@ -1606,6 +1606,7 @@ async function sheetsCall(action, params={}){
 // to the browser's own localStorage so this also runs standalone before it's set up. ----
 const Store = {
   _listCache: {},
+  _dataMap: {}, // จาก list แบบ Turbo: key → value (ลดการ get ทีละอัน)
   _bulkOffMem: false,
   _bulkOff(set){
     try{
@@ -1614,10 +1615,21 @@ const Store = {
     }catch(e){ return this._bulkOffMem; }
   },
   _bulkReset(){ this._bulkOffMem = false; try{ localStorage.removeItem('sheetsBulkOff'); }catch(e){} },
+  _rememberDataMap(data){
+    if(!data || typeof data !== 'object') return;
+    Object.keys(data).forEach(k => {
+      if(data[k] != null) this._dataMap[k] = data[k];
+    });
+  },
   async get(key, shared=false){
     if(SHEETS_READY){
+      // ใช้ค่าจาก list Turbo ก่อน (ข้อมูลครบในรอบเดียว)
+      if(this._dataMap[key] != null){
+        return {key, value: this._dataMap[key], shared:true};
+      }
       try{
         const data = await sheetsCall('get', {key});
+        if(data && data.value != null) this._dataMap[key] = data.value;
         return data ? {key, value: data.value, shared:true} : null;
       }catch(e){ console.error('Sheets get failed', e); return null; }
     }
@@ -1634,6 +1646,7 @@ const Store = {
       try{
         await sheetsCall('set', {key, value});
         this._listCache = {};
+        this._dataMap[key] = value;
         return {key, value, shared:true};
       }catch(e){ console.error('Sheets set failed', e); return null; }
     }
@@ -1648,6 +1661,7 @@ const Store = {
       try{
         await sheetsCall('delete', {key});
         this._listCache = {};
+        delete this._dataMap[key];
         return {key, deleted:true, shared:true};
       }catch(e){ console.error('Sheets delete failed', e); return null; }
     }
@@ -1663,20 +1677,23 @@ const Store = {
       const c = this._listCache[prefix];
       if(c && Date.now() - c.t < 5000){
         const r = await c.p;
-        return {keys: r.keys.slice(), prefix, shared:true};
+        return {keys: r.keys.slice(), prefix, shared:true, data: r.data || {}};
       }
       const p = (async () => {
         const data = await sheetsCall('list', {prefix});
-        return {keys: (data && data.keys) || [], prefix, shared:true};
+        const keys = (data && data.keys) || [];
+        const dataMap = (data && data.data && typeof data.data === 'object') ? data.data : {};
+        this._rememberDataMap(dataMap);
+        return {keys, prefix, shared:true, data: dataMap};
       })();
       this._listCache[prefix] = {t: Date.now(), p};
       try{
         const r = await p;
-        return {keys: r.keys.slice(), prefix, shared:true};
+        return {keys: r.keys.slice(), prefix, shared:true, data: r.data || {}};
       }catch(e){
         console.error('Sheets list failed', e);
         delete this._listCache[prefix];
-        return {keys:[], prefix, shared:true};
+        return {keys:[], prefix, shared:true, data:{}};
       }
     }
     if(window.storage){
@@ -1688,30 +1705,61 @@ const Store = {
         const k = localStorage.key(i);
         if(k && k.startsWith(prefix)) keys.push(k);
       }
-      return {keys, prefix, shared};
-    }catch(e){ return {keys:[], prefix, shared}; }
+      return {keys, prefix, shared, data:{}};
+    }catch(e){ return {keys:[], prefix, shared, data:{}}; }
   },
-  // โหลดหลาย key พร้อมกัน (ทีละชุด) เร็วกว่า get ทีละอันมากเมื่อใช้ Google Sheets
+  // โหลดหลาย key — ใช้ data จาก list Turbo ก่อน ไม่ต้องยิง get ทีละอัน
   async getMany(keys, shared=false, concurrency=10){
     const out = [];
     if(!keys || !keys.length) return out;
-    // ลอง bulk ครั้งเดียวถ้า Apps Script รองรับ action getMany
+    if(SHEETS_READY){
+      const missing = [];
+      keys.forEach(k => {
+        if(this._dataMap[k] != null){
+          out.push({key: k, value: this._dataMap[k], shared:true});
+        } else {
+          missing.push(k);
+        }
+      });
+      if(!missing.length) return out;
+      // ถ้า list ยังไม่เคยดึง data ครบ — ลอง list ทั้ง prefix รอบเดียว
+      if(missing.length > 2){
+        try{
+          const prefix = missing[0].split(':')[0] + ':';
+          await this.list(prefix, shared);
+          const still = [];
+          missing.forEach(k => {
+            if(this._dataMap[k] != null){
+              out.push({key: k, value: this._dataMap[k], shared:true});
+            } else still.push(k);
+          });
+          if(!still.length) return out;
+          keys = still;
+        }catch(e){ keys = missing; }
+      } else {
+        keys = missing;
+      }
+    }
+    // ลอง bulk getMany ของ Apps Script (ถ้ามี)
     if(SHEETS_READY && keys.length > 1 && !this._bulkOff()){
       try{
         const data = await sheetsCall('getMany', {keys});
         if(data && Array.isArray(data.items)){
-          return data.items.map(it => it && it.key != null
+          const items = data.items.map(it => it && it.key != null
             ? {key: it.key, value: it.value, shared:true}
             : null).filter(Boolean);
+          items.forEach(it => { if(it.value != null) this._dataMap[it.key] = it.value; });
+          return out.concat(items);
         }
         if(data && data.values && typeof data.values === 'object'){
-          return keys.map(k => data.values[k] != null
+          const items = keys.map(k => data.values[k] != null
             ? {key: k, value: data.values[k], shared:true}
             : null).filter(Boolean);
+          items.forEach(it => { this._dataMap[it.key] = it.value; });
+          return out.concat(items);
         }
-        this._bulkOff(true); // ตอบกลับแต่รูปแบบไม่รองรับ
+        this._bulkOff(true);
       }catch(e){
-        // เซิร์ฟเวอร์ตอบว่าไม่รู้จัก action → จำไว้ ไม่ต้องลองซ้ำทุกครั้ง (error เครือข่ายไม่นับ)
         if(!(e instanceof TypeError)) this._bulkOff(true);
       }
     }
@@ -1910,9 +1958,11 @@ async function loadBossReport(opts){
 
   const loadPromise = (async () => {
     let keys = [];
+    let listData = {};
     try{
       const res = await Store.list('shift:', true);
       if(res && res.keys) keys = res.keys.slice().sort().reverse();
+      if(res && res.data) listData = res.data;
     }catch(e){ console.error(e); }
 
     const hadCache = !!(bossReportCache.allShifts && bossReportCache.allShifts.length);
@@ -1925,28 +1975,36 @@ async function loadBossReport(opts){
       return [];
     }
 
-    // โหลดเฉพาะกะที่ยังไม่มีในแคช + กะล่าสุด 8 รายการ (เผื่อมีการแก้ไข)
-    // กดปุ่ม 🔄 = โหลดใหม่ทั้งหมด
+    // Turbo list ส่ง value มาด้วย → แปลงเป็นกะได้ทันที ไม่ต้อง get ทีละอัน
+    const fresh = new Map();
+    keys.forEach(k => {
+      const raw = listData[k] != null ? listData[k] : Store._dataMap[k];
+      if(raw == null) return;
+      try{ fresh.set(k, {key: k, s: typeof raw === 'string' ? JSON.parse(raw) : raw}); }
+      catch(e){ console.error('parse shift', k, e); }
+    });
+
+    // ถ้ายังขาดบาง key ค่อยดึงเพิ่ม (ปกติ Turbo จะครบแล้ว)
     const cached = new Map();
     if(!opts.full && bossReportCache.allShifts){
       bossReportCache.allShifts.forEach(x => cached.set(x.key, x));
     }
-    if(opts.full) Store._bulkReset();
-    const recent = new Set(keys.slice(0, 8));
-    const need = keys.filter(k => opts.full || recent.has(k) || !cached.has(k));
-    const items = need.length ? await Store.getMany(need, true, 12) : [];
-    const fresh = new Map();
-    items.forEach(res => {
-      if(!res || !res.value) return;
-      try{ fresh.set(res.key, {key: res.key, s: JSON.parse(res.value)}); }
-      catch(e){ console.error('parse shift', res.key, e); }
-    });
+    const missing = keys.filter(k => !fresh.has(k) && (opts.full || !cached.has(k)));
+    if(missing.length){
+      if(opts.full) Store._bulkReset();
+      const items = await Store.getMany(missing, true, 8);
+      items.forEach(res => {
+        if(!res || !res.value) return;
+        try{ fresh.set(res.key, {key: res.key, s: JSON.parse(res.value)}); }
+        catch(e){ console.error('parse shift', res.key, e); }
+      });
+    }
+
     const allShifts = [];
     keys.forEach(k => {
-      const e = fresh.get(k) || cached.get(k); // โหลดพลาด → ใช้ของเดิมในแคช
+      const e = fresh.get(k) || cached.get(k);
       if(e) allShifts.push(e);
     });
-    // เรียงตาม key ใหม่→เก่า (list เรียงไว้แล้ว แต่ getMany อาจสลับลำดับ)
     allShifts.sort((a,b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
     bossReportCache.allShifts = allShifts;
     bossReportCache.loadedAt = Date.now();
