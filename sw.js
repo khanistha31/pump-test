@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pump-turbo-v3'; // ⚡ อัพเกรดเป็น v3 เพื่อบังคับให้เครื่องพนักงานทุกคนเคลียร์ระบบเก่าทิ้งทันที
+const CACHE_NAME = 'pump-instant-v4'; // อัปเกรดเป็น v4 บังคับลบหน่วยความจำอืดในมือถือออก
 const ASSETS = [
   './',
   'index.html',
@@ -6,7 +6,7 @@ const ASSETS = [
   'icon.png'
 ];
 
-// ติดตั้งและบันทึกโครงสร้างหน้าเว็บลงเครื่องพนักงาน
+// สั่งเซฟหน้าเว็บและดีไซน์ทั้งหมดลงในเครื่องพนักงานทันทีตั้งแต่ตอนติดตั้ง
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
@@ -27,27 +27,20 @@ self.addEventListener('activate', e => {
   );
 });
 
-// ⚡ ฟังก์ชันกรองสัญญาณสำหรับมือถือ (แยกสัญญาณเน็ตและหน่วยความจำออกจากกันเด็ดขาด)
+// ⚡ ตรรกะเปิดปุ๊บติดปั๊บ: ทรัพยากรแอปทั้งหมดดึงจากเครื่องพนักงานโดยตรง ไม่ใช้อินเทอร์เน็ต
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
-  // ถ้าคำขอเป็นสคริปต์ดึงข้อมูลจาก Google Sheets (คำสั่ง POST จากหน้าเว็บ)
+  // สำหรับการเชื่อมต่อข้อมูล API ของ Google Sheets ให้พุ่งตรงไปหาเครือข่ายอินเทอร์เน็ตทันที
   if (e.request.method === 'POST' || url.includes('script.google.com')) {
-    e.respondWith(
-      // พุ่งตัวไปดึงข้อมูลจาก Google Sheets ทันที ไม่ต้องแวะเช็คไฟล์แคชให้ช้าค้าง
-      fetch(e.request).catch(() => {
-        // หากอินเทอร์เน็ตมือถือหลุดถาวร ค่อยสั่งเปิดตรรกะหน้าต่างสำรอง
-        return caches.match(e.request);
-      })
-    );
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
     return;
   }
 
-  // สำหรับหน้าตาเว็บ, รูปภาพไอคอน, ฟอนต์สไตล์ ให้โหลดจากเครื่องทันที (สปีด 0 วินาที)
+  // โหลดหน้ากากเว็บสปีด 0 วินาที จาก Cache ในเครื่องก่อนเสมอ
   e.respondWith(
-    caches.match(e.request).then(cachedResponse => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(e.request);
+    caches.match(e.request).then(response => {
+      return response || fetch(e.request);
     })
   );
 });
