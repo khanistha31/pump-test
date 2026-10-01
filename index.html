@@ -1,88 +1,248 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ใบปิดกะปั๊มน้ำมัน</title>
+<link rel="preconnect" href="https://googleapis.com">
+<link href="https://googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0f0d;
+    --panel: #121a17;
+    --panel2: #17211d;
+    --line: #2a3a33;
+    --amber: #f5a623;
+    --amber-dim: #a8781e;
+    --green: #3fae5c;
+    --text: #eef0ec;
+    --muted: #8ea08f;
+    --red: #e35d5d;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Space Grotesk',sans-serif;
+    padding:24px 16px 60px;
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .num, input[type=number], input.num-input{
+    font-family:'JetBrains Mono',monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap{max-width:1000px;margin:0 auto;}
+
+  header.top{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--amber);
+    padding-bottom:14px;margin-bottom:20px;
+    flex-wrap:wrap;gap:10px;
+  }
+  header.top h1{
+    font-size:20px;margin:0;font-weight:700;letter-spacing:0.2px;
+  }
+  header.top .sub{color:var(--muted);font-size:12.5px;margin-top:4px;}
+  .shift-badge{
+    font-family:'JetBrains Mono',monospace;
+    color:var(--green);border:1px solid #1f5c35;
+    padding:4px 10px;border-radius:3px;font-size:13px;
+    background-color: #0b2214;
+  }
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:16px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:13px;text-transform:none;color:var(--amber);
+    margin:0 0 12px 0;font-weight:600;
+    display:flex;align-items:center;gap:8px;
+  }
+  .card h2::before{content:"";width:3px;height:14px;background:var(--amber);display:inline-block;}
+
+  .grid-info{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;
+  }
+  label{
+    display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;
+  }
+  input[type=text],input[type=date],input[type=number],select{
+    width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--text);border-radius:4px;padding:7px 8px;font-size:14px;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--amber-dim);}
+
+  .line-item{
+    display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center;
+    padding:8px 0;border-bottom:1px dashed var(--line);
+  }
+  .line-item label{margin:0;font-size:13px;color:var(--text);}
+  .line-item input{text-align:right;}
+
+  .toolbar{
+    display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;
+    padding-top:16px;border-top:1px solid var(--line);
+  }
+  .btn{
+    padding:9px 16px;border-radius:5px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);cursor:pointer;font-size:13.5px;
+    font-family:'Space Grotesk',sans-serif;
+  }
+  .btn.primary{background:var(--amber);color:#1b1204;border-color:var(--amber);font-weight:600;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>ใบปิดกะปั๊มน้ำมัน</h1>
+      <div class="sub">ระบบบริหารจัดการกะและคำนวณยอดน้ำมันคงเหลือ</div>
+    </div>
+    <div class="shift-badge">⚡ TURBO MODE ONLINE</div>
+  </header>
+
+  <!-- ส่วนฟอร์มพนักงาน -->
+  <div class="card">
+    <h2>ข้อมูลพนักงานประจำกะ</h2>
+    <div class="grid-info">
+      <div>
+        <label for="employee-select">เลือกพนักงาน</label>
+        <select id="employee-select">
+          <option value="">-- กำลังโหลดรายชื่อ... --</option>
+        </select>
+      </div>
+      <div>
+        <label for="shift-date">วันที่ประจำการ</label>
+        <input type="date" id="shift-date">
+      </div>
+    </div>
+  </div>
+
+  <!-- ส่วนรายการเงินเชื่อ -->
+  <div class="card">
+    <h2>รายการลูกค้าเงินเชื่อ (ยอดค้างชำระประจำกะ)</h2>
+    <div id="credit-list-container">
+      <div style="color:var(--muted); font-size:13px; padding:10px 0;">กำลังโหลดข้อมูลเงินเชื่อความเร็วสูง...</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn primary" onclick="alert('ระบบทดสอบความเร็วสูงทำงานเสร็จสิ้น')">บันทึกข้อมูลเข้าชีตทดสอบ</button>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- ⚡ ส่วนควบคุมระบบ JAVASCRIPT ความเร็วสูง ⚡ -->
+<!-- ========================================== -->
 <script>
+  // ลิงก์ Web App จริงของคุณที่ถูกฝังเข้าตัวแอปโดยตรง
+  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwhQafQraqe3SzFj7MZjPxBr0JTs0OCVhgLm8N8hQ68jPnvrrGRsHUTcLJ6HFsulQ_Ozg/exec"; 
+  const SHEETS_SECRET = "123456"; // รหัสร้านค้า
 
-// ⚡ เปลี่ยน URL ตรงนี้ให้เป็นลิงก์ Web App ที่ได้จาก Google Sheets ทดลองของคุณ
-const WEB_APP_URL = "https://google.com";
-const SHEETS_SECRET = "123456"; // รหัสร้านค้า
+  // ฟังก์ชันโหลดข้อมูลพนักงานความเร็วสูง (ม้วนเดียวจบ)
+  function loadEmployeesFast() {
+    const selectElement = document.getElementById('employee-select');
+    if (!selectElement) return;
 
-// ==========================================
-// ⚡ ฟังก์ชันโหลดข้อมูลพนักงานความเร็วสูง
-// ==========================================
-function loadEmployeesFast() {
-  const selectElement = document.getElementById('employee-select'); // เปลี่ยน ID ให้ตรงกับหน้าเว็บคุณ
-  if (!selectElement) return;
-
-  // ส่งคำขอแบบม้วนเดียวจบ
-  fetch(WEB_APP_URL, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'list', prefix: 'emp_', secret: SHEETS_SECRET })
-  })
-  .then(res => res.json())
-  .then(res => {
-    if (res.error) {
-      console.error('Error:', res.error);
-      return;
-    }
-
-    selectElement.innerHTML = '<option value="">-- เลือกรายชื่อพนักงาน --</option>';
-    const allEmpData = res.data; // ก้อนข้อมูลพนักงานทั้งหมดที่แถมมา
-
-    // ดึงข้อมูลจากหน่วยความจำเครื่องมาใส่ในช่องตัวเลือกทันที (ไม่ต้องยิงขอข้อมูลทีละคน)
-    res.keys.forEach(key => {
-      const empName = allEmpData[key]; 
-      if (empName) {
-        const option = document.createElement('option');
-        option.value = key;
-        option.textContent = empName;
-        selectElement.appendChild(option);
+    fetch(WEB_APP_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'list', prefix: 'emp_', secret: SHEETS_SECRET })
+    })
+    .then(res => res.json())
+    .then(res => {
+      if (res.error) {
+        selectElement.innerHTML = '<option value="">เกิดข้อผิดพลาดในการโหลด</option>';
+        return;
       }
-    });
-  })
-  .catch(err => console.error('Fetch error:', err));
-}
 
-// ==========================================
-// ⚡ ฟังก์ชันโหลดหน้าข้อมูลเงินเชื่อความเร็วสูง
-// ==========================================
-function loadCreditDataFast() {
-  const creditContainer = document.getElementById('credit-list-container'); // เปลี่ยน ID ให้ตรงกับหน้าตารางเงินเชื่อคุณ
-  if (!creditContainer) return;
+      selectElement.innerHTML = '<option value="">-- เลือกรายชื่อพนักงาน --</option>';
+      const allEmpData = res.data; 
 
-  fetch(WEB_APP_URL, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'list', prefix: 'credit_', secret: SHEETS_SECRET })
-  })
-  .then(res => res.json())
-  .then(res => {
-    if (res.error) {
-      console.error('Error:', res.error);
-      return;
-    }
-
-    creditContainer.innerHTML = ''; // ล้างตารางเก่า
-    const allCreditData = res.data; // ก้อนข้อมูลประวัติเงินเชื่อทั้งหมดที่แถมมา
-
-    res.keys.forEach(key => {
-      const creditDetail = allCreditData[key];
-      if (creditDetail) {
-        // 解析ข้อมูลเงินเชื่อ (หากคุณเซฟเป็นแบบ JSON หรือ Text)
-        // ตัวอย่างการวาดแถวตารางเงินเชื่อในเครื่องทันทีโดยไม่ช้าค้าง
-        const row = document.createElement('div');
-        row.className = 'line-item';
-        row.innerHTML = `
-          <label>${key.replace('credit_', '')}</label>
-          <input type="text" class="num-input" value="${creditDetail}" readonly />
-        `;
-        creditContainer.appendChild(row);
+      if (!res.keys || res.keys.length === 0) {
+        selectElement.innerHTML = '<option value="">ไม่มีข้อมูลรายชื่อพนักงาน</option>';
+        return;
       }
+
+      res.keys.forEach(key => {
+        const empName = allEmpData[key]; 
+        if (empName) {
+          const option = document.createElement('option');
+          option.value = key;
+          option.textContent = empName;
+          selectElement.appendChild(option);
+        }
+      });
+    })
+    .catch(err => {
+      console.error('Fetch error:', err);
+      selectElement.innerHTML = '<option value="">โหลดข้อมูลล้มเหลว (เช็คอินเทอร์เน็ต)</option>';
     });
-  })
-  .catch(err => console.error('Fetch error:', err));
-}
+  }
 
-// เรียกใช้งานฟังก์ชันโหลดด่วนตอนเปิดหน้าแอปพลิเคชัน
-window.addEventListener('DOMContentLoaded', () => {
-  loadEmployeesFast();
-  loadCreditDataFast();
-});
+  // ฟังก์ชันโหลดหน้าข้อมูลเงินเชื่อความเร็วสูง (ดึงก้อนใหญ่รอบเดียวจบ)
+  function loadCreditDataFast() {
+    const creditContainer = document.getElementById('credit-list-container');
+    if (!creditContainer) return;
 
-  </script> 
+    fetch(WEB_APP_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'list', prefix: 'credit_', secret: SHEETS_SECRET })
+    })
+    .then(res => res.json())
+    .then(res => {
+      if (res.error) {
+        creditContainer.innerHTML = '<div style="color:var(--red);">ไม่สามารถโหลดข้อมูลเงินเชื่อได้</div>';
+        return;
+      }
+
+      creditContainer.innerHTML = ''; 
+      const allCreditData = res.data; 
+
+      if (!res.keys || res.keys.length === 0) {
+        creditContainer.innerHTML = '<div style="color:var(--muted); font-size:13px;">ไม่มีรายการเงินเชื่อสะสมในขณะนี้</div>';
+        return;
+      }
+
+      res.keys.forEach(key => {
+        const creditDetail = allCreditData[key];
+        if (creditDetail) {
+          const row = document.createElement('div');
+          row.className = 'line-item';
+          row.innerHTML = `
+            <label>${key.replace('credit_', '')}</label>
+            <input type="text" class="num-input" value="${creditDetail} บาท" readonly style="background:transparent; border:none; color:var(--amber); font-weight:700; text-align:right;" />
+          `;
+          creditContainer.appendChild(row);
+        }
+      });
+    })
+    .catch(err => {
+      console.error('Fetch error:', err);
+      creditContainer.innerHTML = '<div style="color:var(--red);">โหลดข้อมูลล้มเหลว (เช็คอินเทอร์เน็ต)</div>';
+    });
+  }
+
+  // เปิดใช้งานฟังก์ชันดึงข้อมูลด่วนเมื่อระบบพร้อม
+  window.addEventListener('DOMContentLoaded', () => {
+    // กำหนดค่าวันที่ปัจจุบันอัตโนมัติ
+    const dateInput = document.getElementById('shift-date');
+    if(dateInput) {
+      const today = new Date().toISOString().split('T')[0];
+      dateInput.value = today;
+    }
+    
+    // เรียกโหลดข้อมูลแบบความเร็วสูง
+    loadEmployeesFast();
+    loadCreditDataFast();
+  });
+</script>
+
+</body>
+</html>
